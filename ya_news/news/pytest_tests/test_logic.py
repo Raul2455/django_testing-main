@@ -32,8 +32,10 @@ def test_user_can_create_comment(author_client, author, new_text_comment,
 
 
 def test_user_cant_use_bad_words(author_client, news):
-    """Если комментарий содержит запрещённые слова, он не будет
-    опубликован, а форма вернёт ошибку."""
+    """
+    Если комментарий содержит запрещённые слова, он не будет
+    опубликован, а форма вернёт ошибку.
+    """
     bad_words_data = {'text': f'Какой-то текст, {BAD_WORDS[0]}, еще текст'}
     url = reverse('news:detail', args=(news.id,))
     response = author_client.post(url, data=bad_words_data)

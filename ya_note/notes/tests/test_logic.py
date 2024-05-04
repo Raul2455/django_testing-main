@@ -67,8 +67,10 @@ class TestRoutes(TestCase):
         self.assertEqual(Note.objects.count(), 1)
 
     def test_empty_slug(self):
-        """Если при создании заметки не заполнен slug, то он формируется
-        автоматически, с помощью функции pytils.translit.slugify"""
+        """
+        Если при создании заметки не заполнен slug, то он формируется
+        автоматически, с помощью функции pytils.translit.slugify
+        """
         url = reverse('notes:add')
         self.data.pop('slug')
         response = self.author_client.post(url, self.data)
