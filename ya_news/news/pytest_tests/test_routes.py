@@ -24,9 +24,8 @@ def test_pages_availability(client, name):
 
 @pytest.mark.django_db
 def test_detail_page(client, news):
-    """
-    Страница отдельной новости доступна анонимному пользователю.
-    """
+    """Страница отдельной новости доступна анонимному пользователю."""
+
     url = reverse('news:detail', args=(news.id,))
     response = client.get(url)
     assert response.status_code == HTTPStatus.OK
