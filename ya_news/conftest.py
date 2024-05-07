@@ -1,13 +1,19 @@
+import pytest
 from datetime import datetime, timedelta
-
 from django.conf import settings
 from django.utils import timezone
-
-import pytest
+from django.test import Client
+from django.contrib.auth import get_user_model
 
 from news.models import News, Comment
 
 TEXT_COMMENT = 'Текст комментария'
+
+
+@pytest.fixture(autouse=True)
+def enable_db_access(db):
+    """Автоматически предоставляет доступ к базе данных для всех тестов."""
+    pass  # No action needed, as db fixture already provides access
 
 
 @pytest.fixture
@@ -17,65 +23,72 @@ def new_text_comment():
 
 
 @pytest.fixture
-def author(django_user_model):
+def user():
     """Создаём пользователя."""
-    return django_user_model.objects.create(username='Автор')
+    return get_user_model().objects.create(username='Автор')
 
 
 @pytest.fixture
-def author_client(author, client):
-    """Создаём автора новости."""
-    client.force_login(author)
+def user_client(user):
+    """Создаём клиент для авторизованного пользователя."""
+    client = Client()
+    client.force_login(user)
     return client
 
 
 @pytest.fixture
-def news():
+def another_user():
+    """Создаём другого пользователя."""
+    return get_user_model().objects.create(username='Другой пользователь')
+
+
+@pytest.fixture
+def another_user_client(another_user):
+    """Создаём клиент для другого пользователя."""
+    client = Client()
+    client.force_login(another_user)
+    return client
+
+
+@pytest.fixture
+def news_item():
     """Создаём новость."""
-    news = News.objects.create(
+    return News.objects.create(
         title='Заголовок',
         text='Текст новости',
         date=datetime.today(),
     )
-    return news
 
 
 @pytest.fixture
-def comment(news, author):
-    """Создаём коммент."""
-    comment = Comment.objects.create(
+def comment_item(news_item, user):
+    """Создаём комментарий."""
+    return Comment.objects.create(
         text=TEXT_COMMENT,
-        news=news,
-        author=author
+        news=news_item,
+        author=user
     )
-    return comment
 
 
 @pytest.fixture
-def list_news():
+def news_list():
     """Создаём список новостей."""
-    today, list_news = datetime.today(), []
-    for index in range(settings.NEWS_COUNT_ON_HOME_PAGE):
-        news = News.objects.create(
-            title='Новость {index}',
-            text='Текст новости',
-        )
-        news.date = today - timedelta(days=index)
-        news.save()
-        list_news.append(news)
-    return list_news
+    today = datetime.today()
+    news_list = [
+        News(title=f'Новость {i}', text='Текст новости',
+             date=today - timedelta(days=i))
+        for i in range(settings.NEWS_COUNT_ON_HOME_PAGE)
+    ]
+    News.objects.bulk_create(news_list)
 
 
 @pytest.fixture
-def list_comments(news, author):
+def comment_list(news_item, user):
     """Создаём список комментариев."""
-    now, list_comment = timezone.now(), []
-    for index in range(2):
-        comment = Comment.objects.create(
-            text='Текст {index}',
-            news=news,
-            author=author,
-        )
-        comment.created = now + timedelta(days=index)
-        comment.save()
-        list_comment.append(comment)
+    now = timezone.now()
+    comment_list = [
+        Comment(text=f'Текст {i}', news=news_item,
+                author=user, created=now + timedelta(minutes=i))
+        for i in range(5)  # Увеличено количество комментариев
+    ]
+    Comment.objects.bulk_create(comment_list)

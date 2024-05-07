@@ -2,13 +2,13 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from notes.models import Note
+from notes.forms import NoteForm
+from . import test_constants
 
 User = get_user_model()
 
 
-class TestRoutes(TestCase):
-
+class TestRoutesBase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.author = User.objects.create(username='author')
@@ -17,12 +17,10 @@ class TestRoutes(TestCase):
         cls.auth_user = User.objects.create(username='auth_user')
         cls.auth_user_client = Client()
         cls.auth_user_client.force_login(cls.auth_user)
-        cls.note = Note.objects.create(
-            title='Заголовок',
-            text='Текст',
-            author=cls.author,
-        )
+        cls.note = NoteForm()
 
+
+class TestNotesList(TestRoutesBase):
     def test_notes_list_for_different_users(self):
         """
         Отдельная заметка передаётся на страницу со списком заметок
@@ -36,19 +34,27 @@ class TestRoutes(TestCase):
         )
         for user, note_in_list in users_statuses:
             with self.subTest():
-                url = reverse('notes:list')
-                response = user.get(url)
+                response = user.get(reverse(test_constants.NOTES_LIST_URL))
+                self.assertIn('object_list', response.context)
                 object_list = response.context['object_list']
-                self.assertIs((self.note in object_list), note_in_list)
+                self.assertIs((TestRoutesBase.note in object_list),
+                              note_in_list)
 
+
+class TestNoteForms(TestRoutesBase):
     def test_pages_contains_form(self):
         """На страницы создания и редактирования заметки передаются формы."""
         urls = (
-            ('notes:add', None),
-            ('notes:edit', (self.note.slug,)),
+            (reverse(test_constants.NOTE_ADD_URL), None),
+            (reverse(test_constants.NOTE_EDIT_URL,
+                     args=(TestRoutesBase.note.slug,))),
         )
-        for name, args in urls:
+        for url, args in urls:
             with self.subTest():
-                url = reverse(name, args=args)
-                response = self.author_client.get(url)
+                response = self.author_client.get(url, args)
                 self.assertIn('form', response.context)
+                self.assertIsInstance(response.context['form'], NoteForm)
+
+
+# Добавленная строка
+TestRoutesBase.note.author = TestRoutesBase.author
