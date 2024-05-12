@@ -33,7 +33,8 @@ def test_user_can_create_comment(author_client, author,
 @pytest.mark.django_db
 def test_user_cant_use_bad_words(author_client, news_instance):
     """Если комментарий содержит запрещённые слова, он не будет
-    опубликован, а форма вернёт ошибку."""
+       опубликован, а форма вернёт ошибку.
+    """
     bad_words_data = {'text': f'Какой-то текст, {BAD_WORDS[0]}, еще текст'}
     url = reverse('news:detail', args=(news_instance.id,))
     response = author_client.post(url, data=bad_words_data)
