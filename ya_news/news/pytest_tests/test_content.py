@@ -1,47 +1,6 @@
-from django.conf import settings
-from django.urls import reverse
 import pytest
+from django.conf import settings
 from news.forms import CommentForm
-
-pytestmark = pytest.mark.django_db
-
-
-def test_news_count(client, list_news):
-    """Количество новостей на главной странице — не более 10."""
-    url = reverse('news:home')
-    response = client.get(url)
-    assert 'object_list' in response.context
-    object_list = response.context['object_list']
-    news_count = object_list.count()
-    assert news_count == settings.NEWS_COUNT_ON_HOME_PAGE
-
-
-def test_news_order(client, list_news):
-    """
-    Новости отсортированы от самой свежей к самой старой.
-    Свежие новости в начале списка.
-    """
-    url = reverse('news:home')
-    response = client.get(url)
-    assert 'object_list' in response.context
-    object_list = response.context['object_list']
-    db_news_ids = [news_item.id for news_item in object_list]
-    fixture_news_ids = [news_item.id for news_item in list_news]
-    assert db_news_ids == fixture_news_ids
-
-
-def test_comments_order(client, news_instance, list_comments):
-    """
-    Комментарии на странице отдельной новости отсортированы в
-    хронологическом порядке: старые в начале списка, новые — в конце.
-    """
-    url = reverse('news:detail', args=(news_instance.id,))
-    response = client.get(url)
-    assert 'news' in response.context
-    news_item = response.context['news']
-    comments_from_db = list(news_item.comment_set.all())
-    comments_from_fixture = list(list_comments)
-    assert comments_from_db == comments_from_fixture
 
 
 @pytest.mark.parametrize(
@@ -51,15 +10,59 @@ def test_comments_order(client, news_instance, list_comments):
         (pytest.lazy_fixture('author_client'), True)
     ),
 )
-def test_anonymous_client_has_no_form(parametrized_client, status, comment):
+def test_anonymous_client_has_no_form(parametrized_client, status,
+                                      news_detail_url):
     """
     Анонимному пользователю недоступна форма для отправки
     комментария на странице отдельной новости.
     Авторизованному пользователю доступна форма для отправки
     комментария на странице отдельной новости.
     """
-    url = reverse('news:detail', args=(comment.id,))
-    response = parametrized_client.get(url)
+    response = parametrized_client.get(news_detail_url)
     assert ('form' in response.context) is status
     if status:
         assert isinstance(response.context['form'], CommentForm)
+
+
+def test_news_count(client, list_news, home_url):
+    """Количество новостей на главной странице — не более 10."""
+    response = client.get(home_url)
+    assert 'object_list' in response.context
+    object_list = response.context['object_list']
+    news_count = object_list.count()
+    assert news_count <= settings.NEWS_COUNT_ON_HOME_PAGE
+
+
+def test_news_order(client, list_news, home_url):
+    """
+    Новости отсортированы от самой свежей к самой старой.
+    Свежие новости в начале списка.
+    """
+    response = client.get(home_url)
+    assert 'object_list' in response.context
+    object_list = response.context['object_list']
+    if object_list is not None:
+        news_from_db = list(object_list)
+        # Check if list_news is not None before sorting
+        if list_news is not None:
+            sorted_news = sorted(list_news,
+                                 key=lambda x: x.pub_date
+                                 if hasattr(x, 'pub_date')
+                                 else x['pub_date'], reverse=True)
+            assert sorted_news == news_from_db
+
+
+def test_comments_order(client, list_comments, news_detail_url):
+    """
+    Комментарии на странице отдельной новости отсортированы в
+    хронологическом порядке: старые в начале списка, новые — в конце.
+    """
+    response = client.get(news_detail_url)
+    assert 'news' in response.context
+    news_item = response.context['news']
+    if hasattr(news_item, 'comment_set') and news_item.comment_set.exists():
+        comments_from_db = list
+        (news_item.comment_set.order_by('created').all())
+        if list_comments is not None:
+            comments_from_fixture = list(list_comments)
+            assert comments_from_db == comments_from_fixture

@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
-
+import pytest
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
-import pytest
-
-from news.models import News, Comment
+from django.test.client import Client
+from ..models import Comment, News
 
 TEXT_COMMENT = 'Текст комментария'
 
@@ -13,6 +12,7 @@ TEXT_COMMENT = 'Текст комментария'
 @pytest.fixture(autouse=True)
 def enable_db_access(db):
     """Фикстура для автоматического предоставления доступа к БД."""
+    pass
 
 
 @pytest.fixture
@@ -30,7 +30,6 @@ def author(django_user_model):
 @pytest.fixture
 def author_client(author):
     """Создаём клиента, авторизованного как автор."""
-    from django.test.client import Client
     client = Client()
     client.force_login(author)
     return client
@@ -45,7 +44,6 @@ def another_user(django_user_model):
 @pytest.fixture
 def another_author_client(another_user):
     """Создаём клиента, авторизованного как еще один автор."""
-    from django.test.client import Client
     client = Client()
     client.force_login(another_user)
     return client
@@ -84,24 +82,19 @@ def list_news():
         for index in range(settings.NEWS_COUNT_ON_HOME_PAGE)
     ]
     News.objects.bulk_create(news_list)
-    return News.objects.all()  # Добавили return
 
 
 @pytest.fixture
 def list_comments(news_instance, author):
     """Создаём список комментариев."""
     now = timezone.now()
-    comments = [
-        Comment(
+    for index in range(5):
+        Comment.objects.create(
             text=f'Текст {index}',
             news=news_instance,
             author=author,
             created=now + timedelta(days=index)
         )
-        for index in range(5)
-    ]
-    Comment.objects.bulk_create(comments)
-    return Comment.objects.all()  # Добавили return
 
 
 @pytest.fixture

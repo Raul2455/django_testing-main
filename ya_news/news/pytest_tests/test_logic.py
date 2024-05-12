@@ -1,8 +1,11 @@
 from http import HTTPStatus
+
 from django.urls import reverse
 import pytest
-from pytest_django.asserts import assertRedirects
+from pytest_django.asserts import assertRedirects, assertFormError
+
 from news.models import Comment
+from news.forms import BAD_WORDS, WARNING
 
 
 @pytest.mark.django_db
@@ -28,16 +31,20 @@ def test_user_can_create_comment(author_client, author,
 
 
 @pytest.mark.django_db
-def test_user_cant_use_bad_words(author_client,
-                                 news_detail_url, bad_words_data):
-    """
-    Проверяем, что пользователь не может
-    использовать запрещённые слова в комментариях.
-    """
-    response = author_client.post(news_detail_url, data=bad_words_data)
-    # Проверяем, что сервер возвращает статус-код 302,
-    # указывающий на перенаправление.
-    assert response.status_code == 302
+def test_user_cant_use_bad_words(author_client, news_instance):
+    """Если комментарий содержит запрещённые слова, он не будет
+    опубликован, а форма вернёт ошибку."""
+    bad_words_data = {'text': f'Какой-то текст, {BAD_WORDS[0]}, еще текст'}
+    url = reverse('news:detail', args=(news_instance.id,))
+    response = author_client.post(url, data=bad_words_data)
+    assertFormError(
+        response,
+        form='form',
+        field='text',
+        errors=WARNING
+    )
+    comments_count = Comment.objects.count()
+    assert comments_count == 0
 
 
 @pytest.mark.django_db

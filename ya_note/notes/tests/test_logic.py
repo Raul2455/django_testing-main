@@ -1,30 +1,20 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
 from django.urls import reverse
 from pytils.translit import slugify
 
 from notes.models import Note
-from notes.forms import WARNING
+from ..forms import WARNING
+from .base import BaseTestCase, Routes
 
 User = get_user_model()
 
 
-class TestRoutes(TestCase):
+class TestRoutes(BaseTestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.author = User.objects.create(username='author')
-        cls.author_client = Client()
-        cls.author_client.force_login(cls.author)
-        cls.auth_user = User.objects.create(username='auth_user')
-        cls.auth_user_client = Client()
-        cls.auth_user_client.force_login(cls.auth_user)
-        cls.note = Note.objects.create(
-            title='Заголовок',
-            text='Текст',
-            author=cls.author,
-        )
+        super().setUpTestData()
         cls.data = {
             'title': 'Новый заголовок',
             'text': 'Новый текст',
@@ -34,8 +24,7 @@ class TestRoutes(TestCase):
     def test_user_can_create_note(self):
         """Залогиненный пользователь может создать заметку."""
         Note.objects.all().delete()
-        url = reverse('notes:add')
-        response = self.author_client.post(url, data=self.data)
+        response = self.author_client.post(Routes.ADD, data=self.data)
         self.assertRedirects(response, reverse('notes:success'))
         self.assertEqual(Note.objects.count(), 1)
         new_note = Note.objects.get()
@@ -47,17 +36,15 @@ class TestRoutes(TestCase):
     def test_anonymous_user_cant_create_note(self):
         """Анонимный пользователь не может создать заметку."""
         notes_count = Note.objects.count()
-        url = reverse('notes:add')
-        response = self.client.post(url, self.data)
+        response = self.client.post(Routes.ADD, self.data)
         login_url = reverse('users:login')
-        expected_url = f'{login_url}?next={url}'
+        expected_url = f'{login_url}?next={Routes.ADD}'
         self.assertRedirects(response, expected_url)
         self.assertEqual(Note.objects.count(), notes_count)
 
     def test_not_unique_slug(self):
         """Невозможно создать две заметки с одинаковым slug."""
-        url = reverse('notes:add')
-        response = self.author_client.post(url, data={
+        response = self.author_client.post(Routes.ADD, data={
             'title': 'Новый заголовок',
             'text': 'Новый текст',
             'slug': self.note.slug
@@ -72,9 +59,8 @@ class TestRoutes(TestCase):
         автоматически, с помощью функции pytils.translit.slugify
         """
         Note.objects.all().delete()
-        url = reverse('notes:add')
         self.data.pop('slug')
-        response = self.author_client.post(url, self.data)
+        response = self.author_client.post(Routes.ADD, self.data)
         self.assertRedirects(response, reverse('notes:success'))
         self.assertEqual(Note.objects.count(), 1)
         new_note = Note.objects.get()
@@ -91,10 +77,11 @@ class TestRoutes(TestCase):
 
     def test_other_user_cant_delete_note(self):
         """Пользователь не может удалять чужие заметки."""
+        notes_count = Note.objects.count()
         url = reverse('notes:delete', args=(self.note.slug,))
         response = self.auth_user_client.post(url)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-        self.assertEqual(Note.objects.count(), 1)
+        self.assertEqual(Note.objects.count(), notes_count)
 
     def test_author_can_edit_note(self):
         """Пользователь может редактировать свои заметки."""
@@ -109,11 +96,11 @@ class TestRoutes(TestCase):
 
     def test_other_user_cant_edit_note(self):
         """Пользователь не может редактировать чужие заметки."""
-        old_note = Note.objects.get(pk=self.note.pk)
         url = reverse('notes:edit', args=(self.note.slug,))
         response = self.auth_user_client.post(url, self.data)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-        new_note = Note.objects.get(pk=self.note.pk)
-        self.assertEqual(old_note.title, new_note.title)
-        self.assertEqual(old_note.text, new_note.text)
-        self.assertEqual(old_note.slug, new_note.slug)
+        self.note.refresh_from_db()
+        self.assertEqual(self.note.title, 'Заголовок')
+        self.assertEqual(self.note.text, 'Текст')
+        self.assertEqual(self.note.slug, Routes.NOTE_SLUG)
+        self.assertEqual(self.note.author, self.author)
