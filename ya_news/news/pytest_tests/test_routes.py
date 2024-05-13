@@ -1,8 +1,9 @@
 from http import HTTPStatus
-from django.test import Client
-import pytest
-from pytest_django.asserts import assertRedirects
 
+import pytest
+
+from django.test import Client
+from pytest_django.asserts import assertRedirects
 
 NEWS_DETAIL_URL = pytest.lazy_fixture('news_detail_url')
 NEWS_EDIT_URL = pytest.lazy_fixture('news_edit_url')
@@ -36,16 +37,10 @@ def test_pages_availability(client, url, expected_status):
     'url, client, expected_status',
     [
         (NEWS_DETAIL_URL, Client(), HTTPStatus.OK),
-        (NEWS_EDIT_URL, Client(enforce_csrf_checks=True),
-         HTTPStatus.FOUND),
-        (NEWS_EDIT_URL, Client(
-            enforce_csrf_checks=True, user=pytest.lazy_fixture('author')),
-         HTTPStatus.FOUND),  # Изменено на 302
-        (NEWS_DELETE_URL, Client(
-            enforce_csrf_checks=True), HTTPStatus.FOUND),
-        (NEWS_DELETE_URL, Client(
-            enforce_csrf_checks=True, user=pytest.lazy_fixture('author')),
-         HTTPStatus.FOUND),  # Изменено на 302
+        (NEWS_EDIT_URL, Client(enforce_csrf_checks=True), HTTPStatus.FOUND),
+        (NEWS_EDIT_URL, pytest.lazy_fixture('author_client'), HTTPStatus.OK),
+        (NEWS_DELETE_URL, Client(enforce_csrf_checks=True), HTTPStatus.FOUND),
+        (NEWS_DELETE_URL, pytest.lazy_fixture('author_client'), HTTPStatus.OK),
     ],
 )
 def test_urls_availability(url, client, expected_status):

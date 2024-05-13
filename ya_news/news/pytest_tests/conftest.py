@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta
+
 import pytest
+
 from django.conf import settings
+from django.test.client import Client
 from django.urls import reverse
 from django.utils import timezone
-from django.test.client import Client
+
 from ..models import Comment, News
 
 TEXT_COMMENT = 'Текст комментария'
@@ -82,6 +85,7 @@ def list_news():
         for index in range(settings.NEWS_COUNT_ON_HOME_PAGE)
     ]
     News.objects.bulk_create(news_list)
+    return news_list
 
 
 @pytest.fixture
@@ -95,6 +99,12 @@ def list_comments(news_instance, author):
             author=author,
             created=now + timedelta(days=index)
         )
+
+
+@pytest.fixture
+def bad_words_data():
+    """Словарь с запрещенными словами."""
+    return {'text': f'Какой-то текст, {settings.BAD_WORDS[0]}, еще текст'}
 
 
 @pytest.fixture
@@ -116,9 +126,9 @@ def logout_url():
 
 
 @pytest.fixture
-def signup_url():
-    """Возвращает URL страницы регистрации."""
-    return reverse('users:signup')
+def news_delete_url(comment):
+    """Возвращает URL страницы удаления комментария."""
+    return reverse('news:delete', args=(comment.id,))
 
 
 @pytest.fixture
@@ -134,12 +144,6 @@ def news_edit_url(comment):
 
 
 @pytest.fixture
-def news_delete_url(comment):
-    """Возвращает URL страницы удаления комментария."""
-    return reverse('news:delete', args=(comment.id,))
-
-
-@pytest.fixture
-def bad_words_data():
-    """Словарь с запрещенными словами."""
-    return {'text': f'Какой-то текст, {settings.BAD_WORDS[0]}, еще текст'}
+def signup_url():
+    """Возвращает URL страницы регистрации."""
+    return reverse('users:signup')
